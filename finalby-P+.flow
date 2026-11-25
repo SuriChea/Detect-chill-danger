@@ -1,0 +1,409 @@
+{
+    "connections": [
+        {
+            "in_id": "{9a234eb2-6ebb-4a2d-8276-e7d75b796961}",
+            "in_index": 0,
+            "out_id": "{f53b9e00-d8ec-42eb-ae35-4035eeb1d94b}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{8ae73c07-e6b7-4151-9ca9-db8f51314caf}",
+            "in_index": 0,
+            "out_id": "{726dc893-958d-4b98-897d-498681f395db}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{f53b9e00-d8ec-42eb-ae35-4035eeb1d94b}",
+            "in_index": 1,
+            "out_id": "{a21fa5c4-b395-4018-8068-142305ab3229}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{8eb68b60-2896-444b-889c-c70616d34c1a}",
+            "in_index": 0,
+            "out_id": "{c646a025-3b7e-4648-abc4-b1960964b228}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{726dc893-958d-4b98-897d-498681f395db}",
+            "in_index": 0,
+            "out_id": "{8ae73c07-e6b7-4151-9ca9-db8f51314caf}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{c646a025-3b7e-4648-abc4-b1960964b228}",
+            "in_index": 0,
+            "out_id": "{cee2491b-7b51-4992-993a-02285c17d3a1}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{f53b9e00-d8ec-42eb-ae35-4035eeb1d94b}",
+            "in_index": 0,
+            "out_id": "{8eb68b60-2896-444b-889c-c70616d34c1a}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{03bd9120-feab-4641-9dea-0070769652b0}",
+            "in_index": 0,
+            "out_id": "{a21fa5c4-b395-4018-8068-142305ab3229}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{a21fa5c4-b395-4018-8068-142305ab3229}",
+            "in_index": 0,
+            "out_id": "{726dc893-958d-4b98-897d-498681f395db}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{81c1f924-3bb9-442e-bd82-4d263d61e69b}",
+            "in_index": 0,
+            "out_id": "{8eb68b60-2896-444b-889c-c70616d34c1a}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{cee2491b-7b51-4992-993a-02285c17d3a1}",
+            "in_index": 0,
+            "out_id": "{f7e66de8-c388-447a-bf1d-c606058d7f59}",
+            "out_index": 0
+        },
+        {
+            "in_id": "{f7e66de8-c388-447a-bf1d-c606058d7f59}",
+            "in_index": 0,
+            "out_id": "{cee2491b-7b51-4992-993a-02285c17d3a1}",
+            "out_index": 0
+        }
+    ],
+    "nodes": [
+        {
+            "id": "{9a234eb2-6ebb-4a2d-8276-e7d75b796961}",
+            "model": {
+                "botName": "",
+                "data": {
+                    "chat_id": -1,
+                    "form": false,
+                    "have_image": false,
+                    "image_before_text": false,
+                    "js_script": "// 1. ดึง raw data จาก msg หรือ payload\nvar raw = {};\nif (typeof msg !== 'undefined' && msg) {\n\traw = (msg.payload !== undefined) ? msg.payload : msg;\n} else if (typeof payload !== 'undefined') {\n\traw = payload;\n}\n\nif (typeof raw === 'string') {\n\ttry {\n\t\traw = JSON.parse(raw);\n\t} catch (e) {\n\t\traw = {};\n\t}\n}\n\n// 2. ค้นหา object ที่มี danger_alert หรือ alert / mqtt_alert ไม่ว่าจะซ้อนอยู่ชั้นไหน\nfunction findAlertObj(obj, depth) {\n\tif (!obj || typeof obj !== 'object' || depth > 4) return null;\n\tif (obj.danger_alert === true || obj.alert === true || obj.mqtt_alert === true) {\n\t\treturn obj;\n\t}\n\tfor (var key in obj) {\n\t\tif (Object.prototype.hasOwnProperty.call(obj, key)) {\n\t\t\tvar found = findAlertObj(obj[key], depth + 1);\n\t\t\tif (found) return found;\n\t\t}\n\t}\n\treturn null;\n}\n\nvar target = findAlertObj(raw, 0) || ((raw && typeof raw.payload === 'object') ? raw.payload : (raw || {}));\n\nvar isDanger = Boolean(target.danger_alert);\nvar isMqttAlert = Boolean(target.alert || target.mqtt_alert);\n\nmessage = \"\";\n\nif (isDanger) {\n\tmessage = \"🚨 แจ้งเตือนฉุกเฉิน! ตรวจพบเด็กเข้าใกล้วัตถุอันตราย (มีด) ในระยะประชิด!\";\n} else if (isMqttAlert) {\n\tif (target.message) {\n\t\tmessage = target.message;\n\t} else {\n\t\tvar sensorObj = target[\"myroom/sensor/data\"] || {};\n\t\tvar sType = target.type || sensorObj.type || \"N/A\";\n\t\tvar sVal = target.value || sensorObj.value || \"ON\";\n\t\tmessage = \"🏠 อัปเดตสถานะ Smart Home\\n🔧 ประเภท: \" + sType + \"\\n📌 สถานะ: \" + sVal;\n\t}\n}\n\n// ส่งค่าออกไปยัง msg.payload ด้วย เผื่อ TGNotify อ่านจาก msg.payload\nif (typeof msg !== 'undefined' && msg && typeof msg === 'object' && message !== \"\") {\n\tmsg.payload = message;\n}",
+                    "message": "",
+                    "reply_message_id": 0,
+                    "script": true,
+                    "token": "",
+                    "widget_state": {
+                        "editor_setting": {
+                            "autoComplete": {
+                                "caseSensitivity": true,
+                                "enable": true,
+                                "threshold": 3
+                            },
+                            "indent": {
+                                "enable": true
+                            },
+                            "theme": "Material Dark",
+                            "whitespace": {
+                                "enable": false,
+                                "size": 2
+                            }
+                        },
+                        "splt0": 178,
+                        "splt1": 111
+                    }
+                },
+                "name": "TGNotify",
+                "node_enable": true
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 1292,
+                "y": 247
+            }
+        },
+        {
+            "id": "{f7e66de8-c388-447a-bf1d-c606058d7f59}",
+            "model": {
+                "name": "ButtonRun"
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 418,
+                "y": 152
+            }
+        },
+        {
+            "id": "{cee2491b-7b51-4992-993a-02285c17d3a1}",
+            "model": {
+                "data": {
+                    "filename": "D:/Dowload-DiskD/CIRA-Group/drive/videoplayback.mp4",
+                    "height": 275,
+                    "loop": true,
+                    "width": 284
+                },
+                "name": "VideoFile",
+                "node_enable": true
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 627,
+                "y": 133
+            }
+        },
+        {
+            "id": "{726dc893-958d-4b98-897d-498681f395db}",
+            "model": {
+                "mqtt_sub": {
+                    "cert_file": "-",
+                    "host": "broker.emqx.io",
+                    "is_use_cert": true,
+                    "is_use_ssl": false,
+                    "pass": "",
+                    "port": 1883,
+                    "qos": 1,
+                    "topic": "myroom/sensor/data",
+                    "user": ""
+                },
+                "name": "MqttSub",
+                "node_enable": true
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 570,
+                "y": 418
+            }
+        },
+        {
+            "id": "{8ae73c07-e6b7-4151-9ca9-db8f51314caf}",
+            "model": {
+                "name": "ButtonRun"
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 399,
+                "y": 418
+            }
+        },
+        {
+            "id": "{c646a025-3b7e-4648-abc4-b1960964b228}",
+            "model": {
+                "data": {
+                    "auto_start": false,
+                    "caption": "detect",
+                    "code": "from ultralytics import YOLO\r\nimport cv2\r\n\r\nmodel = YOLO(\"yolov8n.pt\")\r\n\r\n# ค่ากลางเริ่มต้นสำหรับทดลองกับวิดีโอทั่วไป (ควรปรับตามมุมกล้องจริงอีกครั้ง)\r\nMIN_CHILD_H_RATIO = 0.25\r\nMIN_CHILD_Y2_RATIO = 0.60\r\nCONF_THRESHOLD = 0.30\r\n\r\ndef handle_request(req):\r\n\tpayload, img = getReqData(req)\r\n\t\r\n\tif img is None:\r\n\t\treturn makeRespData(payload, img)\r\n\t\t\r\n\toutput_img = img.copy()\r\n\timg_h, img_w = img.shape[:2]\r\n\t\r\n\tresults = model.predict(\r\n\t\tsource=img,\r\n\t\tconf=CONF_THRESHOLD,\r\n\t\tverbose=False\r\n\t)\r\n\t\r\n\tchild_boxes = []\r\n\tother_person_boxes = []\r\n\tknife_boxes = []\r\n\r\n\tfor box in results[0].boxes:\r\n\t\tcls_id = int(box.cls[0].cpu().numpy())\r\n\t\tcls_name = model.names[cls_id].lower()\r\n\t\t\r\n\t\tx1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())\r\n\t\th_ratio = (y2 - y1) / float(img_h) if img_h > 0 else 0.0\r\n\t\ty2_ratio = y2 / float(img_h) if img_h > 0 else 0.0\r\n\t\t\r\n\t\tif cls_name == \"person\":\r\n\t\t\tis_likely_child = (h_ratio >= MIN_CHILD_H_RATIO) and (y2_ratio >= MIN_CHILD_Y2_RATIO)\r\n\t\t\t\r\n\t\t\tif is_likely_child:\r\n\t\t\t\tchild_boxes.append({\"x1\": x1, \"y1\": y1, \"x2\": x2, \"y2\": y2})\r\n\t\t\t\tcv2.rectangle(output_img, (x1, y1), (x2, y2), (0, 255, 0), 2)\r\n\t\t\t\tcv2.putText(\r\n\t\t\t\t\toutput_img,\r\n\t\t\t\t\tf\"Child (h:{h_ratio:.2f}, y2:{y2_ratio:.2f})\",\r\n\t\t\t\t\t(x1, max(y1 - 10, 20)),\r\n\t\t\t\t\tcv2.FONT_HERSHEY_SIMPLEX,\r\n\t\t\t\t\t0.45,\r\n\t\t\t\t\t(0, 255, 0),\r\n\t\t\t\t\t2\r\n\t\t\t\t)\r\n\t\t\telse:\r\n\t\t\t\tother_person_boxes.append({\"x1\": x1, \"y1\": y1, \"x2\": x2, \"y2\": y2})\r\n\t\t\t\tcv2.rectangle(output_img, (x1, y1), (x2, y2), (0, 255, 255), 2)\r\n\t\t\t\tcv2.putText(\r\n\t\t\t\t\toutput_img,\r\n\t\t\t\t\tf\"Person (h:{h_ratio:.2f}, y2:{y2_ratio:.2f})\",\r\n\t\t\t\t\t(x1, max(y1 - 10, 20)),\r\n\t\t\t\t\tcv2.FONT_HERSHEY_SIMPLEX,\r\n\t\t\t\t\t0.45,\r\n\t\t\t\t\t(0, 255, 255),\r\n\t\t\t\t\t2\r\n\t\t\t\t)\r\n\t\t\t\r\n\t\telif cls_name == \"knife\" or \"knife\" in cls_name:\r\n\t\t\tknife_boxes.append({\"x1\": x1, \"y1\": y1, \"x2\": x2, \"y2\": y2})\r\n\t\t\tcv2.rectangle(output_img, (x1, y1), (x2, y2), (255, 0, 0), 2)\r\n\t\t\tcv2.putText(output_img, \"Knife\", (x1, max(y1 - 10, 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)\r\n\r\n\tpayload[\"child_boxes\"] = child_boxes\r\n\tpayload[\"other_person_boxes\"] = other_person_boxes\r\n\tpayload[\"knife_boxes\"] = knife_boxes\r\n\tpayload[\"child_detected\"] = len(child_boxes) > 0\r\n\tpayload[\"knife_detected\"] = len(knife_boxes) > 0\r\n\r\n\treturn makeRespData(payload, output_img)",
+                    "editor_setting": {
+                        "autoComplete": {
+                            "caseSensitivity": true,
+                            "enable": true,
+                            "threshold": 3
+                        },
+                        "indent": {
+                            "enable": true
+                        },
+                        "theme": "Material Dark",
+                        "whitespace": {
+                            "enable": false,
+                            "size": 2
+                        }
+                    },
+                    "icon": ":/cira_bernoulli_python_plus/model/python_plus.png",
+                    "not_use_image": false,
+                    "python_path": "C:/Users/suree/AppData/Local/Programs/Python/Python39/python.exe"
+                },
+                "name": "Python+",
+                "node_enable": true
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 798,
+                "y": 133
+            }
+        },
+        {
+            "id": "{f53b9e00-d8ec-42eb-ae35-4035eeb1d94b}",
+            "model": {
+                "name": "PipeConnection"
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 1159,
+                "y": 266
+            }
+        },
+        {
+            "id": "{8eb68b60-2896-444b-889c-c70616d34c1a}",
+            "model": {
+                "data": {
+                    "auto_start": false,
+                    "caption": "process",
+                    "code": "import cv2\r\nimport numpy as np\r\n\r\ndef handle_request(req):\r\n\t# 1. ดึงข้อมูล payload และภาพเข้ามาจากโหนดด้านหน้า\r\n\tpayload, img = getReqData(req)\r\n\t\r\n\t# ป้องกัน Error กรณีภาพเป็น None\r\n\tif img is None:\r\n\t\treturn makeRespData(payload, img)\r\n\t\t\r\n\toutput_img = img.copy()\r\n\t\r\n\t# 2. รับค่าพิกัดเด็กและมีดที่ส่งมาจากโหนดหน้าสุด\r\n\tchild_boxes = payload.get(\"child_boxes\", [])\r\n\tknife_boxes = payload.get(\"knife_boxes\", [])\r\n\t\r\n\tdanger_alert = False\r\n\t\r\n\t# กำหนดระยะห่างอันตราย (หน่วยเป็นพิกเซล - ปรับเพิ่ม/ลดได้ตามมุมกล้อง)\r\n\tDANGER_DISTANCE_THRESHOLD = 500 \r\n\t\r\n\t# 3. คำนวณระยะห่าง (Euclidean Distance) ระหว่างเด็กกับมีด\r\n\tfor child in child_boxes:\r\n\t\tcx1, cy1, cx2, cy2 = child[\"x1\"], child[\"y1\"], child[\"x2\"], child[\"y2\"]\r\n\t\tchild_center_x = (cx1 + cx2) / 2\r\n\t\tchild_center_y = (cy1 + cy2) / 2\r\n\t\t\r\n\t\tfor knife in knife_boxes:\r\n\t\t\tkx1, ky1, kx2, ky2 = knife[\"x1\"], knife[\"y1\"], knife[\"x2\"], knife[\"y2\"]\r\n\t\t\tknife_center_x = (kx1 + kx2) / 2\r\n\t\t\tknife_center_y = (ky1 + ky2) / 2\r\n\t\t\t\r\n\t\t\t# คำนวณระยะทางทางเรขาคณิต\r\n\t\t\tdistance = np.sqrt((child_center_x - knife_center_x)**2 + (child_center_y - knife_center_y)**2)\r\n\t\t\t\r\n\t\t\t# 4. เช็กเงื่อนไข: ถ้าเข้าใกล้เกินระยะอันตราย\r\n\t\t\tif distance < DANGER_DISTANCE_THRESHOLD:\r\n\t\t\t\tdanger_alert = True\r\n\t\t\t\t\r\n\t\t\t\t# วาดเส้นเตือนสีแดงเชื่อมระหว่างเด็กกับมีด\r\n\t\t\t\tcv2.line(\r\n\t\t\t\t\toutput_img, \r\n\t\t\t\t\t(int(child_center_x), int(child_center_y)), \r\n\t\t\t\t\t(int(knife_center_x), int(knife_center_y)), \r\n\t\t\t\t\t(0, 0, 255), 3\r\n\t\t\t\t)\r\n\t\t\t\t\r\n\t\t\t\t# วาดข้อความแจ้งเตือนภัยบนภาพวิดีโอ\r\n\t\t\t\tcv2.putText(\r\n\t\t\t\t\toutput_img, \r\n\t\t\t\t\t\"DANGER: Child near knife!\", \r\n\t\t\t\t\t(30, 50), \r\n\t\t\t\t\tcv2.FONT_HERSHEY_SIMPLEX, \r\n\t\t\t\t\t0.8, \r\n\t\t\t\t\t(0, 0, 255), 2\r\n\t\t\t\t)\r\n\r\n\t# 5. แนบสถานะอันตรายลงใน payload เพื่อส่งต่อไปยังโหนด TGNotify\r\n\tpayload[\"danger_alert\"] = danger_alert\r\n\r\n\t# 6. ส่งภาพและ payload ที่อัปเดตแล้วกลับเข้าระบบ\r\n\tif danger_alert:\r\n\t\tpayload[\"message\"] = \"🚨 แจ้งเตือนฉุกเฉิน! ตรวจพบเด็กเข้าใกล้วัตถุอันตราย (มีด) ในระยะประชิด!\"\r\n\t\tpayload[\"alert\"] = True\r\n\telse:\r\n\t\tpayload[\"message\"] = \"\"\r\n\t\tpayload[\"alert\"] = False\r\n\r\n\tpayload[\"danger_alert\"] = danger_alert\r\n\treturn makeRespData(payload, output_img)",
+                    "editor_setting": {
+                        "autoComplete": {
+                            "caseSensitivity": true,
+                            "enable": true,
+                            "threshold": 3
+                        },
+                        "indent": {
+                            "enable": true
+                        },
+                        "theme": "Material Dark",
+                        "whitespace": {
+                            "enable": false,
+                            "size": 2
+                        }
+                    },
+                    "icon": ":/cira_bernoulli_python_plus/model/python_plus.png",
+                    "not_use_image": false,
+                    "python_path": "C:/Users/suree/AppData/Local/Programs/Python/Python39/python.exe"
+                },
+                "name": "Python+",
+                "node_enable": true
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 969,
+                "y": 133
+            }
+        },
+        {
+            "id": "{03bd9120-feab-4641-9dea-0070769652b0}",
+            "model": {
+                "height": 349,
+                "name": "Debug",
+                "output_h": 0,
+                "output_v": 0,
+                "page_index": 0,
+                "payload_h": 0,
+                "payload_v": 0,
+                "width": 468
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 912,
+                "y": 418
+            }
+        },
+        {
+            "id": "{a21fa5c4-b395-4018-8068-142305ab3229}",
+            "model": {
+                "data": {
+                    "auto_start": false,
+                    "caption": "sensor-pro",
+                    "code": "import json\r\n\r\n\r\ndef _to_float(val):\r\n\tif val is None or isinstance(val, bool):\r\n\t\treturn None\r\n\ttry:\r\n\t\treturn float(val)\r\n\texcept (TypeError, ValueError):\r\n\t\treturn None\r\n\r\n\r\ndef _extract_sensor_data(raw):\r\n\tif isinstance(raw, str):\r\n\t\ttry:\r\n\t\t\traw = json.loads(raw)\r\n\t\texcept Exception:\r\n\t\t\treturn {\"value\": raw}\r\n\r\n\tif not isinstance(raw, dict):\r\n\t\treturn {}\r\n\r\n\tinner = raw.get(\"payload\", raw)\r\n\tif isinstance(inner, str):\r\n\t\ttry:\r\n\t\t\tinner = json.loads(inner)\r\n\t\texcept Exception:\r\n\t\t\treturn {\"value\": inner}\r\n\r\n\tif not isinstance(inner, dict):\r\n\t\treturn {}\r\n\r\n\tif (\r\n\t\t\"value\" in inner\r\n\t\tor \"type\" in inner\r\n\t\tor \"temperature\" in inner\r\n\t\tor \"temp\" in inner\r\n\t\tor \"humidity\" in inner\r\n\t\tor \"humi\" in inner\r\n\t):\r\n\t\treturn inner\r\n\r\n\tfor _, val in inner.items():\r\n\t\tif isinstance(val, dict) and (\r\n\t\t\t\"value\" in val\r\n\t\t\tor \"type\" in val\r\n\t\t\tor \"temperature\" in val\r\n\t\t\tor \"temp\" in val\r\n\t\t\tor \"humidity\" in val\r\n\t\t\tor \"humi\" in val\r\n\t\t):\r\n\t\t\treturn val\r\n\r\n\treturn inner\r\n\r\n\r\ndef _extract_temp_and_humi(sensor_data):\r\n\ttemp = _to_float(sensor_data.get(\"temperature\", sensor_data.get(\"temp\")))\r\n\thumi = _to_float(sensor_data.get(\"humidity\", sensor_data.get(\"humi\")))\r\n\r\n\ts_type = str(sensor_data.get(\"type\", \"\")).strip().lower()\r\n\ts_val = _to_float(sensor_data.get(\"value\"))\r\n\r\n\tif temp is None and s_val is not None and s_type in (\"temperature\", \"temp\", \"c\"):\r\n\t\ttemp = s_val\r\n\r\n\tif humi is None and s_val is not None and s_type in (\"humidity\", \"humi\", \"rh\"):\r\n\t\thumi = s_val\r\n\r\n\treturn temp, humi\r\n\r\n\r\ndef handle_request(req):\r\n\tpayload, img = getReqData(req)\r\n\r\n\tif not isinstance(payload, dict):\r\n\t\tpayload = {}\r\n\r\n\tsensor_data = _extract_sensor_data(payload)\r\n\ts_type = sensor_data.get(\"type\") or \"N/A\"\r\n\ts_val = sensor_data.get(\"value\") or \"N/A\"\r\n\r\n\ttemp, humi = _extract_temp_and_humi(sensor_data)\r\n\r\n\ttemp_out_of_range = temp is not None and (temp < 23.0 or temp > 26.0)\r\n\thumi_out_of_range = humi is not None and (humi < 45.0 or humi > 60.0)\r\n\r\n\t# แจ้งเตือนสถานะ ON เฉพาะกรณีที่ไม่ได้ส่งค่าอุณหภูมิ/ความชื้นมาใน type\r\n\ts_type_lower = str(s_type).strip().lower()\r\n\tis_on_status = (\r\n\t\tstr(s_val).upper() == \"ON\"\r\n\t\tand s_type_lower not in (\"temperature\", \"temp\", \"c\", \"humidity\", \"humi\", \"rh\")\r\n\t)\r\n\r\n\tmqtt_alert = is_on_status or temp_out_of_range or humi_out_of_range\r\n\tmessages = []\r\n\r\n\tif temp_out_of_range:\r\n\t\tmessages.append(\r\n\t\t\t\"❄️ แจ้งเตือนอุณหภูมิผิดปกติ! แนะนำให้เปิด AC\\n\"\r\n\t\t\tf\"🌡️ อุณหภูมิ: {temp:g} °C (เกณฑ์ปกติ 23 - 26 °C)\"\r\n\t\t)\r\n\r\n\tif humi_out_of_range:\r\n\t\tmessages.append(\r\n\t\t\t\"💧 แจ้งเตือนความชื้นผิดปกติ! แนะนำให้เปิดเครื่องปรับอากาศ\\n\"\r\n\t\t\tf\"💦 ความชื้น: {humi:g}% (เกณฑ์ปกติ 45 - 60%)\"\r\n\t\t)\r\n\r\n\tif is_on_status:\r\n\t\tif s_type != \"N/A\":\r\n\t\t\tmessages.append(\r\n\t\t\t\t\"🏠 อัปเดตสถานะ Smart Home\\n\"\r\n\t\t\t\tf\"🔧 ประเภท: {s_type}\\n\"\r\n\t\t\t\tf\"📌 สถานะ: {s_val}\"\r\n\t\t\t)\r\n\t\telse:\r\n\t\t\tmessages.append(\"🔔 แจ้งเตือนสถานะ: ON\")\r\n\r\n\tmqtt_message = \"\\n\\n\".join(messages)\r\n\r\n\tpayload[\"temperature\"] = temp\r\n\tpayload[\"humidity\"] = humi\r\n\tpayload[\"temp_alert\"] = temp_out_of_range\r\n\tpayload[\"humi_alert\"] = humi_out_of_range\r\n\tpayload[\"mqtt_alert\"] = mqtt_alert\r\n\tpayload[\"mqtt_message\"] = mqtt_message\r\n\tpayload[\"alert\"] = mqtt_alert\r\n\tpayload[\"message\"] = mqtt_message\r\n\r\n\treturn makeRespData(payload, img)",
+                    "editor_setting": {
+                        "autoComplete": {
+                            "caseSensitivity": true,
+                            "enable": true,
+                            "threshold": 3
+                        },
+                        "indent": {
+                            "enable": true
+                        },
+                        "theme": "Material Dark",
+                        "whitespace": {
+                            "enable": false,
+                            "size": 2
+                        }
+                    },
+                    "icon": ":/cira_bernoulli_python_plus/model/python_plus.png",
+                    "not_use_image": false,
+                    "python_path": "C:/Users/suree/AppData/Local/Programs/Python/Python39/python.exe"
+                },
+                "name": "Python+",
+                "node_enable": true
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 741,
+                "y": 380
+            }
+        },
+        {
+            "id": "{81c1f924-3bb9-442e-bd82-4d263d61e69b}",
+            "model": {
+                "height": 815,
+                "name": "Debug",
+                "output_h": 0,
+                "output_v": 0,
+                "page_index": 2,
+                "payload_h": 0,
+                "payload_v": 0,
+                "width": 693
+            },
+            "ngo": {
+                "comment": {
+                    "data": "",
+                    "show": false
+                }
+            },
+            "position": {
+                "fix": false,
+                "x": 1444,
+                "y": -76
+            }
+        }
+    ],
+    "scene_data": {
+        "flow_view_fix": false,
+        "flow_view_pos_x": 115.51894538237877,
+        "flow_view_pos_y": -111.24368553659701,
+        "flow_view_zoom_factor": 0.8846165308804257,
+        "scene_version": 1
+    }
+}
