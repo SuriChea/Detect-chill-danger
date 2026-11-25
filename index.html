@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cozy & Realistic 3D Smart Room Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(18, 26, 43, 0.85);
+            --border-color: rgba(255, 255, 255, 0.12);
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            user-select: none;
+        }
+
+        /* UI Control Panel */
+        #ui-container {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            width: 320px;
+            z-index: 10;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
+
+        .mqtt-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-sub);
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-red);
+            box-shadow: 0 0 8px var(--accent-red);
+            transition: 0.3s;
+        }
+        .dot.connected {
+            background-color: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+        .control-group label { font-size: 13px; color: var(--text-sub); }
+        
+        button {
+            padding: 16px 14px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-off { background-color: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+        .btn-off:hover { background-color: rgba(239, 68, 68, 0.35); }
+        
+        .btn-on { background-color: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+        .btn-on:hover { background-color: rgba(16, 185, 129, 0.35); }
+
+        /* ส่วนจำลองค่าเซนเซอร์ */
+        .sensor-section {
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .slider-group {
+            margin-top: 12px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-sub);
+            margin-bottom: 6px;
+        }
+
+        .slider-header span.val {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 5px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+            accent-color: var(--accent-blue);
+            cursor: pointer;
+        }
+
+        #hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--text-sub);
+            border: 1px solid var(--border-color);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <div class="header">
+            <h2>3D Smart Living Room</h2>
+            <div class="mqtt-status">
+                <div id="connection-dot" class="dot"></div>
+                <span id="connection-text">Connecting...</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>เครื่องปรับอากาศ (AC)</label>
+            <button id="btn-ac" class="btn-off" onclick="toggleDevice('ac')">OFF</button>
+        </div>
+        <div class="control-group">
+            <label>หน้าต่าง 1</label>
+            <button id="btn-window1" class="btn-off" onclick="toggleDevice('window1')">OFF</button>
+        </div>
+        <div class="control-group">
+            <label>หน้าต่าง 2</label>
+            <button id="btn-window2" class="btn-off" onclick="toggleDevice('window2')">OFF</button>
+        </div>
+        <div class="control-group">
+            <label>ประตู</label>
+            <button id="btn-door" class="btn-off" onclick="toggleDevice('door')">OFF</button>
+        </div>
+        
+        <div class="sensor-section">
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span>อุณหภูมิ</span>
+                    <span class="val"><span id="temp-val">25.0</span> °C</span>
+                </div>
+                <input type="range" id="temp-slider" min="16" max="35" step="0.5" value="25.0" oninput="publishSensorData('temperature')">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-header">
+                    <span>ความชื้น</span>
+                    <span class="val"><span id="hum-val">60</span> %</span>
+                </div>
+                <input type="range" id="hum-slider" min="20" max="90" step="1" value="60" oninput="publishSensorData('humidity')">
+            </div>
+        </div>
+    </div>
+
+    <div id="hint">🖱️ คลิกค้างเพื่อหมุนดูห้อง 3D | สโครลเพื่อซูม</div>
+
+    <!-- CDN Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <script>
+        let mqttClient = null;
+
+        const topics = {
+            sensor: 'myroom/sensor/data'
+        };
+
+        function updateConnectionStatus(isConnected) {
+            const dot = document.getElementById('connection-dot');
+            const text = document.getElementById('connection-text');
+            if (isConnected) {
+                dot.classList.add('connected');
+                text.innerText = 'Connected';
+            } else {
+                dot.classList.remove('connected');
+                text.innerText = 'Disconnected';
+            }
+        }
+
+        function connectMQTT() {
+            const brokerUrl = 'wss://broker.emqx.io:8084/mqtt'; 
+            const username = '';  
+            const password = '';
+
+            const options = {
+                clientId: 'mqttx_' + Math.random().toString(16).substr(2, 8),
+                username: username,
+                password: password,
+                clean: true
+            };
+
+            if (mqttClient) mqttClient.end();
+            mqttClient = mqtt.connect(brokerUrl, options);
+
+            mqttClient.on('connect', () => {
+                updateConnectionStatus(true);
+                mqttClient.subscribe(topics.sensor);
+            });
+
+            mqttClient.on('error', () => updateConnectionStatus(false));
+            mqttClient.on('offline', () => updateConnectionStatus(false));
+
+            mqttClient.on('message', (topic, payload) => {
+                const message = payload.toString();
+                if (topic === topics.sensor) {
+                    try {
+                        const data = JSON.parse(message);
+                        if (data.type === 'temperature' && data.value !== undefined) {
+                            document.getElementById('temp-val').innerText = parseFloat(data.value).toFixed(1);
+                            document.getElementById('temp-slider').value = data.value;
+                        } else if (data.type === 'humidity' && data.value !== undefined) {
+                            document.getElementById('hum-val').innerText = data.value;
+                            document.getElementById('hum-slider').value = data.value;
+                        } else if (Object.prototype.hasOwnProperty.call(deviceStates, data.type) && data.value !== undefined) {
+                            updateDeviceState(data.type, data.value);
+                        } else if (data.temp !== undefined || data.hum !== undefined) {
+                            // รองรับข้อความจากอุปกรณ์เวอร์ชันเดิมที่ส่งค่า temp/hum พร้อมกัน
+                            if (data.temp !== undefined) {
+                                document.getElementById('temp-val').innerText = parseFloat(data.temp).toFixed(1);
+                                document.getElementById('temp-slider').value = data.temp;
+                            }
+                            if (data.hum !== undefined) {
+                                document.getElementById('hum-val').innerText = data.hum;
+                                document.getElementById('hum-slider').value = data.hum;
+                            }
+                        }
+                    } catch(e) {
+                        document.getElementById('hum-val').innerText = message;
+                    }
+                }
+            });
+        }
+
+        connectMQTT();
+
+        const deviceStates = { ac: false, window1: false, window2: false, door: false };
+        function toggleDevice(deviceName) {
+            deviceStates[deviceName] = !deviceStates[deviceName];
+            const newState = deviceStates[deviceName] ? 'ON' : 'OFF';
+            if (mqttClient && mqttClient.connected) {
+                mqttClient.publish(topics.sensor, JSON.stringify({ type: deviceName, value: newState }));
+            }
+        }
+
+        function publishSensorData(type) {
+            const isTemperature = type === 'temperature';
+            const slider = document.getElementById(isTemperature ? 'temp-slider' : 'hum-slider');
+            const value = isTemperature ? parseFloat(slider.value) : parseInt(slider.value, 10);
+            const valueLabel = document.getElementById(isTemperature ? 'temp-val' : 'hum-val');
+            valueLabel.innerText = isTemperature ? value.toFixed(1) : value;
+
+            const payload = JSON.stringify({ type, value });
+            if (mqttClient && mqttClient.connected) {
+                mqttClient.publish(topics.sensor, payload);
+            }
+        }
+
+        function updateDeviceState(deviceName, state) {
+            const isOn = (state === 'ON');
+            deviceStates[deviceName] = isOn;
+            const btn = document.getElementById(`btn-${deviceName}`);
+            if (btn) {
+                btn.innerText = state;
+                btn.className = isOn ? 'btn-on' : 'btn-off';
+            }
+            
+            if (deviceObjects[deviceName]) {
+                const dev = deviceObjects[deviceName];
+                dev.targetState = isOn;
+                if (dev.indicatorMaterial) {
+                    dev.indicatorMaterial.color.setHex(isOn ? 0x10b981 : 0xef4444);
+                    dev.indicatorMaterial.emissive.setHex(isOn ? 0x10b981 : 0x000000);
+                }
+            }
+        }
+
+        // --- 3D Cozy Room Scene (Three.js) ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0e17);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(12, 14, 16);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2.05;
+
+        // ระบบแสงสว่าง warm ambient + directional shadow
+        const ambientLight = new THREE.AmbientLight(0xfff5ea, 0.7);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffeedd, 0.8);
+        dirLight.position.set(8, 18, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        scene.add(dirLight);
+
+        // โคมไฟส่องลงกลางห้อง (Warm Spot Light)
+        const spotLight = new THREE.SpotLight(0xffaa44, 0.5);
+        spotLight.position.set(0, 8, 0);
+        spotLight.angle = Math.PI / 3;
+        scene.add(spotLight);
+
+        // พื้นห้องไม้ปาเกต์ (Wood Floor)
+        const floorGeo = new THREE.PlaneGeometry(10, 8);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.4 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // พรมกลางห้อง (Cozy Rug)
+        const rugGeo = new THREE.PlaneGeometry(5, 3.5);
+        const rugMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 });
+        const rug = new THREE.Mesh(rugGeo, rugMat);
+        rug.rotation.x = -Math.PI / 2;
+        rug.position.set(0, 0.01, 0.5);
+        rug.receiveShadow = true;
+        scene.add(rug);
+
+        // ผนังห้องโปร่งใสพร้อมขอบโมเดิร์น
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, transparent: true, opacity: 0.4 });
+        const wallBorderMat = new THREE.MeshBasicMaterial({ color: 0x475569 });
+
+        function createWall(w, h, d, x, y, z) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const wall = new THREE.Mesh(geo, wallMat);
+            wall.position.set(x, y, z);
+            scene.add(wall);
+
+            const edges = new THREE.EdgesGeometry(geo);
+            const line = new THREE.LineSegments(edges, wallBorderMat);
+            line.position.set(x, y, z);
+            scene.add(line);
+        }
+
+        createWall(10.2, 0.5, 0.2, 0, 0.25, -4.1);
+        createWall(10.2, 0.5, 0.2, 0, 0.25, 4.1);
+        createWall(0.2, 0.5, 8.2, -5.1, 0.25, 0);
+        createWall(0.2, 0.5, 8.2, 5.1, 0.25, 0);
+
+        // --- สร้าง Furniture ตกแต่งห้องให้สมจริง ---
+        function createFurniture() {
+            // 1. โซฟา (Sofa)
+            const sofaGroup = new THREE.Group();
+            const sofaMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.7 }); // สีน้ำเงินสดใส
+            const cushionMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b }); // หมอนสีส้ม
+
+            const base = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.4, 1.2), sofaMat);
+            base.position.y = 0.2;
+            base.castShadow = true;
+            sofaGroup.add(base);
+
+            const backrest = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.8, 0.3), sofaMat);
+            backrest.position.set(0, 0.7, -0.45);
+            backrest.castShadow = true;
+            sofaGroup.add(backrest);
+
+            // หมอนอิง 2 ใบ
+            const pillow1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.15), cushionMat);
+            pillow1.position.set(-1.1, 0.6, -0.25);
+            pillow1.rotation.z = 0.2;
+            sofaGroup.add(pillow1);
+
+            const pillow2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.15), cushionMat);
+            pillow2.position.set(1.1, 0.6, -0.25);
+            pillow2.rotation.z = -0.2;
+            sofaGroup.add(pillow2);
+
+            sofaGroup.position.set(0, 0, -2);
+            scene.add(sofaGroup);
+
+            // 2. โต๊ะกาแฟกลางห้อง (Coffee Table)
+            const tableMat = new THREE.MeshStandardMaterial({ color: 0x1e1b18, roughness: 0.3 });
+            const tableTop = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.08, 32), tableMat);
+            tableTop.position.set(0, 0.45, 0.5);
+            tableTop.castShadow = true;
+            scene.add(tableTop);
+
+            const legMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8 });
+            for(let i=0; i<3; i++) {
+                const angle = (i * Math.PI * 2) / 3;
+                const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.02, 0.45), legMat);
+                leg.position.set(Math.cos(angle)*0.5, 0.225, 0.5 + Math.sin(angle)*0.5);
+                leg.castShadow = true;
+                scene.add(leg);
+            }
+
+            // 3. ต้นไม้กระถาง (Potted Plant)
+            const plantGroup = new THREE.Group();
+            const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.2, 0.5, 16), new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
+            pot.position.y = 0.25;
+            pot.castShadow = true;
+            plantGroup.add(pot);
+
+            const leafMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.6 });
+            for(let i=0; i<5; i++) {
+                const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), leafMat);
+                leaf.scale.set(1, 0.3, 1.8);
+                leaf.rotation.x = Math.PI / 4;
+                leaf.rotation.y = (i * Math.PI * 2) / 5;
+                leaf.position.set(0, 0.55, 0);
+                plantGroup.add(leaf);
+            }
+            plantGroup.position.set(-4, 0, -3);
+            scene.add(plantGroup);
+
+            // 4. โต๊ะทำงาน + จอคอมพิวเตอร์ (Workstation)
+            const deskGroup = new THREE.Group();
+            const desk = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.08, 2.2), new THREE.MeshStandardMaterial({ color: 0x475569 }));
+            desk.position.y = 0.8;
+            desk.castShadow = true;
+            deskGroup.add(desk);
+
+            // จอ Monitor
+            const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.6, 1.1), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2 }));
+            monitor.position.set(0.2, 1.25, 0);
+            monitor.castShadow = true;
+            deskGroup.add(monitor);
+
+            const screenGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.5), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+            screenGlow.rotation.y = -Math.PI / 2;
+            screenGlow.position.set(0.17, 1.25, 0);
+            deskGroup.add(screenGlow);
+
+            deskGroup.position.set(-4.2, 0, 1.5);
+            scene.add(deskGroup);
+        }
+
+        createFurniture();
+
+        // --- สร้างอุปกรณ์ควบคุม Smart Home (AC, Windows, Door) ---
+        const deviceObjects = {};
+
+        // 1. เครื่องปรับอากาศ (AC)
+        function createAC() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 0.5), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 }));
+            body.castShadow = true;
+            group.add(body);
+
+            // บานสวิงลม
+            const flap = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.02, 0.3), new THREE.MeshStandardMaterial({ color: 0x64748b }));
+            flap.position.set(0, -0.3, 0.1);
+            group.add(flap);
+
+            // LED สถานะ
+            const ledMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+            const led = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 16), ledMat);
+            led.position.set(0.9, -0.15, 0.26);
+            group.add(led);
+
+            group.position.set(-4.8, 2.2, -0.5);
+            group.rotation.y = Math.PI / 2;
+            scene.add(group);
+
+            deviceObjects.ac = { group, flap, indicatorMaterial: ledMat, targetState: false, currentFlapRot: 0 };
+        }
+
+        // 2. หน้าต่างบานเลื่อน (Sliding Windows - ปรับปรุงโครงสร้างให้เลื่อนเปิดชัดเจน)
+        function createWindow(x, z, name) {
+            const group = new THREE.Group();
+            
+            // ขอบเฟรมหลัก
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 0.1), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 }));
+            group.add(frame);
+
+            // บานกระจกซ้าย (อยู่กับที่)
+            const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45, roughness: 0.1, transmission: 0.9 });
+            const leftGlass = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.25, 0.03), glassMat);
+            leftGlass.position.set(-0.5, 0, -0.02);
+            group.add(leftGlass);
+
+            // บานกระจกขวา (บานที่จะเลื่อนเปิดออกไปทางซ้าย)
+            const rightGlass = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.25, 0.03), glassMat.clone());
+            rightGlass.position.set(0.5, 0, 0.02);
+            group.add(rightGlass);
+
+            // LED แสดงสถานะ
+            const ledMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+            const led = new THREE.Mesh(new THREE.BoxGeometry(1, 0.12, 0.12), ledMat);
+            led.position.set(0, 0.75, 0.05);
+            group.add(led);
+
+            group.position.set(x, 1.6, z);
+            scene.add(group);
+
+            deviceObjects[name] = { 
+                group, 
+                rightGlass, 
+                indicatorMaterial: ledMat, 
+                targetState: false, 
+                currentSlide: 0 
+            };
+        }
+
+        // 3. ประตู (Door)
+        function createDoor() {
+            const group = new THREE.Group();
+
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.3, 1.3), new THREE.MeshStandardMaterial({ color: 0x334155 }));
+            group.add(frame);
+
+            const doorPivot = new THREE.Group();
+            doorPivot.position.set(0, 0, -0.6); // จุดหมุนบานพับ
+
+            const panel = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.15, 1.2), new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5 }));
+            panel.position.set(0, 0, 0.6);
+            panel.castShadow = true;
+            doorPivot.add(panel);
+
+            const handle = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.8 }));
+            handle.position.set(0.08, 0, 1.1);
+            doorPivot.add(handle);
+
+            group.add(doorPivot);
+
+            const ledMat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+            const led = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 16), ledMat);
+            led.position.set(0.08, 1.2, 0.5);
+            group.add(led);
+
+            group.position.set(4.9, 1.15, 2.2);
+            scene.add(group);
+
+            deviceObjects.door = { 
+                group, 
+                doorPivot, 
+                indicatorMaterial: ledMat, 
+                targetState: false, 
+                currentAngle: 0 
+            };
+        }
+
+        createAC();
+        createWindow(-2.2, -4.0, 'window1');
+        createWindow(2.2, -4.0, 'window2');
+        createDoor();
+
+        // Loop อนิเมชันการเคลื่อนไหวสมูท 60FPS
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 1. แอร์: เปิด/ปิด บานพัดลมสวิง
+            if (deviceObjects.ac) {
+                const ac = deviceObjects.ac;
+                const targetRot = ac.targetState ? Math.PI / 3 : 0;
+                ac.currentFlapRot += (targetRot - ac.currentFlapRot) * 0.1;
+                ac.flap.rotation.x = ac.currentFlapRot;
+            }
+
+            // 2. หน้าต่าง: เลื่อนเปิดสไลด์กระจกบานขวาไปซ้อนบานซ้าย
+            ['window1', 'window2'].forEach(winName => {
+                if (deviceObjects[winName]) {
+                    const win = deviceObjects[winName];
+                    const targetSlide = win.targetState ? -0.85 : 0; // เลื่อนเปิดออกไปทางซ้าย -0.85 หน่วย
+                    win.currentSlide += (targetSlide - win.currentSlide) * 0.1;
+                    win.rightGlass.position.x = 0.5 + win.currentSlide;
+                }
+            });
+
+            // 3. ประตู: เปิดหมุนบานพับ
+            if (deviceObjects.door) {
+                const door = deviceObjects.door;
+                const targetAngle = door.targetState ? -Math.PI / 2.2 : 0;
+                door.currentAngle += (targetAngle - door.currentAngle) * 0.1;
+                door.doorPivot.rotation.y = door.currentAngle;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
